@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+apt-get clean
+apt-get autoremove --yes
+rm --force --recursive /tmp/* /var/lib/apt/lists/* /var/tmp/*
