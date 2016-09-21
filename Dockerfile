@@ -16,7 +16,7 @@ RUN sed --in-place "s/HISTSIZE=1000/HISTSIZE=9999/g" /root/.bashrc && \
 	touch ~/.hushlogin
 
 # Configure: ca-certificates
-RUN mkdir --parents /usr/share/ca-certificates/docker/
+RUN mkdir --mode=0755 --parents /usr/share/ca-certificates/docker/
 
 # Configure: entrypoint
 RUN mkdir --mode=0755 --parents /etc/entrypoint.d/

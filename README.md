@@ -58,6 +58,14 @@ if [[ ! -e $EP_RUN ]] ; then
 fi
 ```
 
+#### Entrypoint Scripts
+
+#### ca-certificates
+
+The embedded entrypoint script is located at `/etc/entrypoint.d/ca-certificates` and performs the following actions:
+
+1. Certificates located in `/usr/share/ca-certificates/docker/` are deployted into the containers trust store.
+
 ## Debian Package Deployment
 
 A typical Dockerfile will install packages similar to the following:
