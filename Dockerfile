@@ -1,4 +1,4 @@
-FROM ubuntu:14.04.4
+FROM ubuntu:16.04
 MAINTAINER Richard Davis <crashvb@gmail.com>
 
 USER root

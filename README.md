@@ -72,7 +72,7 @@ A typical Dockerfile will install packages similar to the following:
 
 ```dockerfile
 RUN apt-get update && \
-	apt-get install --force-yes --yes long list of packages && \
+	apt-get install --no-install-recommends --yes long list of packages && \
 	apt-get clean && \
 	apt-get autoremove && \
 	rm --force --recursive /tmp/* /var/lib/apt/lists/* /var/tmp/*
