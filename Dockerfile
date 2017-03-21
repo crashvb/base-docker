@@ -5,7 +5,7 @@ USER root
 
 # Install packages, download files ...
 ADD docker-* entrypoint /sbin/
-RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget
+RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget vim
 
 # Configure: bash profile
 RUN sed --in-place "s/HISTSIZE=1000/HISTSIZE=9999/g" /root/.bashrc && \
