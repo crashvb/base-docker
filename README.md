@@ -54,7 +54,12 @@ set -e
 if [[ ! -e $EP_RUN ]] ; then
 	log "Configuring $(basename $0) for first run ..."
 	export VAR1=${VAR1:=VAL1}
-	VAR2=VAL2 render_template /usr/local/share/foo.conf.template > /etc/foo/foo.conf
+
+    # Interpolate all variables
+	VAR2=VAL2 render_template /usr/local/share/foo.conf /etc/foo/foo.conf
+
+    # Interpolate select variables
+	render_template /usr/local/share/bar.conf /etc/bar/bar.conf "\$ONLY \$THESE \$VARS"
 fi
 ```
 
@@ -90,7 +95,6 @@ For that purpose, three scripts have been embedded in the base image:
 
 As of yet, this images does not contain any customizations; however, in the future it could contain common packages or initialization scripts. Typical uses could include:
 
-* Deployment of CA certificates.
 * Generation and / or distribution of SSH authorized_keys and known_hosts files.
 
 ## Standard Configuration
@@ -107,6 +111,10 @@ As of yet, this images does not contain any customizations; however, in the futu
 │  ├─ docker-apt-install
 │  ├─ entrypoint
 │  └─ entrypoint.ca-certificates
+├─ usr/
+│  └─ share/
+│     └─ ca-certificates/
+│        └─ docker/
 └─ var/
    └─ local/
       └─ container_initialized
