@@ -40,6 +40,7 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 #### Exported Functions for Sub-scripts
 
 * <tt>log</tt> - Logs to standard output.
+* <tt>generate_password</tt> - Generates a random password.
 * <tt>render_template</tt> - Renders a given bash template.
 
 #### Sample Entrypoint Script
@@ -91,6 +92,10 @@ For that purpose, three scripts have been embedded in the base image:
 * <tt>docker-apt-clean</tt> - Cleans transient aptitude caches.
 * <tt>docker-apt</tt> - Invokes both of the above scripts.
 
+### Environment Variables for docker-apt-install
+
+* APT_ALL_REPOS - If defined, all configured repositories will be enabled before installing packges.
+
 ## Organization-wide Customizations
 
 As of yet, this images does not contain any customizations; however, in the future it could contain common packages or initialization scripts. Typical uses could include:
@@ -106,9 +111,9 @@ As of yet, this images does not contain any customizations; however, in the futu
 ├─ etc/
 │  └─ entrypoint.d/
 ├─ sbin/
-│  ├─ docker-apt
-│  ├─ docker-apt-clean
-│  ├─ docker-apt-install
+│  ├─ docker-yum
+│  ├─ docker-yum-clean
+│  ├─ docker-yum-install
 │  ├─ entrypoint
 │  └─ entrypoint.ca-certificates
 ├─ usr/

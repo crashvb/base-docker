@@ -1,5 +1,5 @@
 FROM ubuntu:16.04
-MAINTAINER Richard Davis <crashvb@gmail.com>
+LABEL maintainer "Richard Davis <crashvb@gmail.com>"
 
 USER root
 

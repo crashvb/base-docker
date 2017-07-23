@@ -11,7 +11,7 @@ done
 log "Checking docker-apt-clean ..."
 for i in /tmp /usr/share/{info,lintian,man} /var/lib/apt/lists /var/tmp ; do
 	log "	$i"
-	[[ ! "$(ls -A $i)" ]]
+	[[ ! "$(ls --almost-all $i)" ]]
 done
 
 log "Checking entrypoint::generate_password ..."
@@ -32,7 +32,6 @@ EOF
 
 render_template $template $instantiation
 [[ -f $instantiation ]] && grep $TEST1_PASSWORD $instantiation
-
 
 log "--- Test Passed ---"
 exit 0
