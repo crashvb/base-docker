@@ -72,6 +72,29 @@ The embedded entrypoint script is located at `/etc/entrypoint.d/ca-certificates`
 
 1. Certificates located in `/usr/share/ca-certificates/docker/` are deployted into the containers trust store.
 
+### Healthcheck Script
+
+The emedded healthcheck script is located at `/sbin/healthcheck` and performs the following actions:
+
+1. If the container has not finished initializing, the script returns success.
+2. Scripts in `/etc/healthcheck.d/` are executed, aborting after the first failure.
+
+#### Exported Functions for Sub-scripts
+
+* <tt>log</tt> - Logs to standard output.
+
+#### Sample Healthcheck Script
+
+```bash
+#!/bin/bash
+# /etc/healthcheck.d/foo
+
+set -e
+
+log "Checking if $(basename $0) is healthy ..."
+ps --pid=1
+```
+
 ## Debian Package Deployment
 
 A typical Dockerfile will install packages similar to the following:
@@ -109,13 +132,15 @@ As of yet, this images does not contain any customizations; however, in the futu
 ```
 /
 ├─ etc/
-│  └─ entrypoint.d/
+│  ├─ entrypoint.d/
+│  └─ healthcheck.d/
 ├─ sbin/
 │  ├─ docker-yum
 │  ├─ docker-yum-clean
 │  ├─ docker-yum-install
 │  ├─ entrypoint
-│  └─ entrypoint.ca-certificates
+│  ├─ entrypoint.ca-certificates
+│  └─ healthcheck
 ├─ usr/
 │  └─ share/
 │     └─ ca-certificates/
