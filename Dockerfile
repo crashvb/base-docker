@@ -5,6 +5,7 @@ USER root
 
 # Install packages, download files ...
 ADD docker-* entrypoint healthcheck /sbin/
+ADD entrypoint.sh /usr/local/lib/
 RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget vim
 
 # Configure: bash profile

@@ -1,14 +1,8 @@
 #!/bin/bash
 
+source /usr/local/lib/entrypoint.sh
+
 set -e
-
-export EP_RUN=/var/local/container_initialized
-
-function log
-{
-	echo "$(date +%Y-%m-%d_%H:%M:%S) | $(basename $0) | $@"
-}
-export -f log
 
 # Wait for the container to finish initializing
 if [[ -e "$EP_RUN" ]] ; then
