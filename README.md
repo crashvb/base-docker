@@ -34,6 +34,7 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 
 #### Environment Variables for Sub-scripts
 
+* <tt>EP_PWGEN_LENGTH</tt> - The length of randomly generated passwords (default: `64`).
 * <tt>EP_RUN</tt> - The fully-qualified path to the entrypoint run file: `/var/local/container_initialized`.
 * <tt>EP_USER</tt> - The name of the user as which to execute `CMD`.
 

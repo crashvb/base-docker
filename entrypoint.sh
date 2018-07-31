@@ -11,10 +11,11 @@ export -f log
 # 1 - name
 function generate_password
 {
+	pwgen_length=${EP_PWGEN_LENGTH:-64}
 	var="${1^^}_PASSWORD"
 	if [[ -z "$(eval echo \$$var)" ]] ; then
 		log "Generating $var ..."
-		export $var=$(pwgen --capitalize --numerals --secure -1 64)
+		export $var=$(pwgen --capitalize --numerals --secure -1 $pwgen_length)
 		install --mode=0400 /dev/null /root/${1}_password
 		echo "$var=$(eval echo \$$var)" > /root/${1}_password
 	else
