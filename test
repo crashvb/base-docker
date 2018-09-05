@@ -15,23 +15,35 @@ for i in /tmp /usr/share/{info,lintian,man} /var/lib/apt/lists /var/tmp ; do
 done
 
 log "Checking entrypoint::generate_password ..."
+log "	environment"
 export TEST1_PASSWORD=test1
 generate_password test1
-[[ ! -f /root/test1_password ]]
+[[ -s $EP_SECRETS_ROOT/test1_password ]] && grep --quiet test1 $EP_SECRETS_ROOT/test1_password
 
+log "	generated"
 generate_password test2
-[[ -s /root/test2_password ]]
+[[ -s $EP_SECRETS_ROOT/test2_password ]] && [[ ${#TEST2_PASSWORD} -eq $EP_PWGEN_LENGTH ]]
+
+log "	secrets"
+echo test3 > $EP_SECRETS_ROOT/test3_password
+generate_password test3
+[[ -s $EP_SECRETS_ROOT/test3_password ]] && grep --quiet test3 $EP_SECRETS_ROOT/test3_password
 
 log "Checking entrypoint::render_template ..."
 template=$(mktemp)
 instantiation=$(mktemp --dry-run)
 
 cat <<- EOF > $template.template
-value here >>> \${TEST1_PASSWORD} <<< value here
+test1 value here >>> \${TEST1_PASSWORD} <<< test1 value here
+test2 value here >>> \${TEST2_PASSWORD} <<< test2 value here
+test3 value here >>> \${TEST3_PASSWORD} <<< test3 value here
 EOF
 
 render_template $template $instantiation
-[[ -f $instantiation ]] && grep $TEST1_PASSWORD $instantiation
+[[ -f $instantiation ]] && \
+	grep $TEST1_PASSWORD $instantiation && \
+	grep $TEST2_PASSWORD $instantiation && \
+	grep $TEST3_PASSWORD $instantiation
 
 log "--- Test Passed ---"
 exit 0

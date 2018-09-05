@@ -36,6 +36,7 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 
 * <tt>EP_PWGEN_LENGTH</tt> - The length of randomly generated passwords (default: `64`).
 * <tt>EP_RUN</tt> - The fully-qualified path to the entrypoint run file: `/var/local/container_initialized`.
+* <tt>EP_SECRETS_ROOT</tt> - The directory in which docker secrets are mounted. (default: `/run/secrets`).
 * <tt>EP_USER</tt> - The name of the user as which to execute `CMD`.
 
 #### Exported Functions for Sub-scripts
@@ -57,10 +58,10 @@ if [[ ! -e $EP_RUN ]] ; then
 	log "Configuring $(basename $0) for first run ..."
 	export VAR1=${VAR1:=VAL1}
 
-    # Interpolate all variables
+	# Interpolate all variables
 	VAR2=VAL2 render_template /usr/local/share/foo.conf /etc/foo/foo.conf
 
-    # Interpolate select variables
+	# Interpolate select variables
 	render_template /usr/local/share/bar.conf /etc/bar/bar.conf "\$ONLY \$THESE \$VARS"
 fi
 ```

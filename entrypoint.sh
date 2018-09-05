@@ -1,6 +1,8 @@
 #!/bin/bash
 
+export EP_PWGEN_LENGTH=${EP_PWGEN_LENGTH:-64}
 export EP_RUN=/var/local/container_initialized
+export EP_SECRETS_ROOT=${EP_SECRETS_ROOT:-/run/secrets}
 
 function log
 {
@@ -11,15 +13,25 @@ export -f log
 # 1 - name
 function generate_password
 {
-	pwgen_length=${EP_PWGEN_LENGTH:-64}
-	var="${1^^}_PASSWORD"
-	if [[ -z "$(eval echo \$$var)" ]] ; then
-		log "Generating $var ..."
-		export $var=$(pwgen --capitalize --numerals --secure -1 $pwgen_length)
-		install --mode=0400 /dev/null /root/${1}_password
-		echo "$var=$(eval echo \$$var)" > /root/${1}_password
+	secrets=$EP_SECRETS_ROOT/${1,,}_password
+	var=${1^^}_PASSWORD
+
+	if [[ ! -d $EP_SECRETS_ROOT ]] ; then
+		log "WARN: Creating secrets root: $EP_SECRETS_ROOT ..."
+		mkdir --parents $EP_SECRETS_ROOT
+	fi
+
+	if [[ -f $secrets ]] ; then
+		log "Importing $var from secrets ..."
+		export $var=$(<$secrets)
+	elif [[ -z "$(eval echo \$$var)" ]] ; then
+		log "Generating $var in secrets ..."
+		export $var=$(pwgen --capitalize --numerals --secure -1 $EP_PWGEN_LENGTH)
+		install --mode=0400 /dev/null $secrets
+		echo $(eval echo \$$var) > $secrets
 	else
-		log "Importing $var ..."
+		log "Importing $var from environment ..."
+		echo $(eval echo \$$var) > $secrets
 	fi
 }
 export -f generate_password
