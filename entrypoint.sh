@@ -21,7 +21,7 @@ function generate_password
 		mkdir --parents $EP_SECRETS_ROOT
 	fi
 
-	if [[ -f $secrets ]] ; then
+	if [[ -e $secrets ]] ; then
 		log "Importing $var from secrets ..."
 		export $var=$(<$secrets)
 	elif [[ -z "$(eval echo \$$var)" ]] ; then
