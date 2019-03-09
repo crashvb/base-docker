@@ -1,5 +1,6 @@
 #!/bin/bash
 
+export EP_GPG_KEY_LENGTH=${EP_GPG_KEY_LENGTH:-4096}
 export EP_PWGEN_LENGTH=${EP_PWGEN_LENGTH:-64}
 export EP_RUN=/var/local/container_initialized
 export EP_SECRETS_ROOT=${EP_SECRETS_ROOT:-/run/secrets}
@@ -9,6 +10,47 @@ function log
 	echo "$(date +%Y-%m-%d_%H:%M:%S) | $(basename $0) | $@"
 }
 export -f log
+
+# 1 - secret name
+# 2 - real name
+# 3 - email
+function generate_gpgkey
+{
+	key=${1,,}.gpg
+	secrets=$EP_SECRETS_ROOT/$key
+
+	export GNUPGHOME=$(eval echo ~${1,,})/.gnupg
+
+	if [[ ! -d $EP_SECRETS_ROOT ]] ; then
+		log "WARN: Creating secrets root: $EP_SECRETS_ROOT ..."
+		mkdir --parents $EP_SECRETS_ROOT
+	fi
+
+	mkdir --mode=0700 --parents $GNUPGHOME
+
+	tmp=$(gpg --list-secret-keys 2>/devnull)
+	if [[ -e $secrets ]] ; then
+		log "Importing $key from secrets ..."
+		gpg --allow-secret-key-import --import --verbose $secrets
+	elif [[ -z $tmp || -n $tmp ]] ; then
+		log "Generating $key in secrets ..."
+
+		cat <<- EOF | gpg --batch --gen-key --verbose
+			Key-Type: 1
+			Key-Length: $EP_GPG_KEY_LENGTH
+			Name-Real: ${2:-${1,,}}
+			Name-Email: ${3:-${1,,}@$HOSTNAME}
+			Expire-Date: 0
+		EOF
+		gpg --armor --export --output $secrets
+		gpg --armor --export-secret-key >> $secrets
+	else
+		log "Importing $key from container ..."
+		gpg --armor --export --output $secrets
+		gpg --armor --export-secret-key >> $secrets
+	fi
+}
+export -f generate_gpgkey
 
 # 1 - name
 function generate_password
@@ -35,6 +77,35 @@ function generate_password
 	fi
 }
 export -f generate_password
+
+function generate_sshkey
+{
+	# Note: ssh-keygen -f id_rsa -y > id_rsa.pub
+	key=id_rsa.${1,,}
+	secrets=$EP_SECRETS_ROOT/$key
+	userkey=$(eval echo ~${1,,})/.ssh/id_rsa
+
+	if [[ ! -d $EP_SECRETS_ROOT ]] ; then
+		log "WARN: Creating secrets root: $EP_SECRETS_ROOT ..."
+		mkdir --parents $EP_SECRETS_ROOT
+	fi
+
+	mkdir --parents $(basename $userkey)
+
+	if [[ -e $secrets ]] ; then
+		log "Importing $key from secrets ..."
+		ln --force --symbolic $secrets $userkey
+	elif [[ ! -e $userkey  ]] ; then
+		log "Generating $key in secrets ..."
+		ssh-keygen -f $secrets -t rsa -N ''
+		ln --symbolic $secrets $userkey
+	else
+		log "Importing $key from container ..."
+		install --mode=0400 $userkey $secrets
+		ln --force --symbolic $secrets $userkey
+	fi
+}
+export -f generate_sshkey
 
 # 1 - template / defaults prefix
 # 2 - target
