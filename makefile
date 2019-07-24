@@ -3,19 +3,19 @@
 include makefile.config
 -include makefile.config.local
 
-.PHONY: build debug default logs remove run shell start status stop test
+.PHONY: build-% debug-% default logs remove run-% shell start status stop test
 
-default: build
+build-%: %/Dockerfile
+	docker build --force-rm=true --tag=$(registry)$(namespace)/$(image):$*-$(tag) $(buildargs) $(ARGS) $*
 
-build:
-	docker build --force-rm=true --tag=$(registry)/$(image):$(tag) $(ARGS) .
-
-debug:
+debug-%:
 	docker run \
+		--hostname=$(name) \
+		--interactive=true \
 		--name=$(name) \
 		--tty=true \
 		$(runargs) \
-		$(registry)/$(image):$(tag) \
+		$(registry)$(namespace)/$(image):$*-$(tag) \
 		$(ARGS)
 
 logs:
@@ -24,13 +24,14 @@ logs:
 remove:
 	docker rm --volumes=true $(ARGS) $(name)
 
-run:
+run-%:
 	docker run \
 		--detach=true \
+		--hostname=$(name) \
 		--name=$(name) \
 		--tty=true \
 		$(runargs) \
-		$(registry)/$(image):$(tag) \
+		$(registry)$(namespace)/$(image):$*-$(tag) \
 		$(ARGS)
 
 shell:
@@ -45,13 +46,13 @@ status:
 stop:
 	docker stop $(ARGS) $(name)
 
-test:
+test-%:
 	docker create \
 		--name=$(name)-test \
 		--rm=true \
 		--tty=true \
 		$(runargs) \
-		$(registry)/$(image):$(tag) \
+		$(registry)$(namespace)/$(image):$*-$(tag) \
 		/test \
 		$(ARGS)
 	docker cp test $(name)-test:/
