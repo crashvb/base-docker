@@ -8,7 +8,7 @@ for i in /etc/entrypoint.d/*
 do
 	if [[ -f $i && -x $i ]] ; then
 		log "Invoking: $(basename $i) ..."
-		$i "$@"
+		source $i "$@"
 	fi
 done
 
