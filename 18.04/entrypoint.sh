@@ -7,7 +7,7 @@ export EP_SECRETS_ROOT=${EP_SECRETS_ROOT:-/run/secrets}
 
 function log
 {
-	echo "$(date +%Y-%m-%d_%H:%M:%S) | $(basename $0) | $@"
+	echo -e "$(date +%Y-%m-%d_%H:%M:%S) | $(basename $0) | $@"
 }
 export -f log
 

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+source /usr/local/lib/entrypoint.sh
+
+set -e
+
+# Wait for the container to finish initializing
+if [[ -e "$EP_RUN" ]] ; then
+	for i in /etc/healthcheck.d/*
+	do
+		if [[ -f $i && -x $i ]] ; then
+			log "Invoking: $(basename $i) ..."
+			$i "$@"
+			[[ $? -ne 0 ]] && exit $?
+		fi
+	done
+fi
+
+exit 0
+
