@@ -9,7 +9,7 @@ echo "Tagging and pushing: $custom ..."
 docker tag $IMAGE_NAME $custom
 docker push $custom
 
-custom="${DOCKER_REPO}:${tag_prefix}${SOURCE_COMMIT: -12}"
+custom="${DOCKER_REPO}:${tag_prefix}${SOURCE_COMMIT:0:12}"
 echo "Tagging and pushing: $custom ..."
 docker tag $IMAGE_NAME $custom
 docker push $custom
