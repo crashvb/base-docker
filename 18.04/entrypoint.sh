@@ -117,7 +117,7 @@ function render_template
 		while IFS='=' read -r key value
 		do
 			eval "export $key=\${$key:=$value}"
-			log "	$key=$(eval echo \$$key)"
+			log "	$key=${!key}"
 		done < "$1.defaults"
 	fi
 
