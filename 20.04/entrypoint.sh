@@ -65,7 +65,7 @@ function generate_password
 
 	if [[ -e $secrets ]] ; then
 		log "Importing $var from secrets ..."
-		export $var=$(<$secrets)
+		export $var="$(<$secrets)"
 	elif [[ -z "$(eval echo \$$var)" ]] ; then
 		log "Generating $var in secrets ..."
 		export $var=$(pwgen --capitalize --numerals --secure -1 $EP_PWGEN_LENGTH)
