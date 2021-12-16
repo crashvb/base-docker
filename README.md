@@ -22,7 +22,7 @@ By defining both instructions in the base image, and by embedding a shell script
 * A fail-safe command is present in every derived imaged.
 * Container initialization is facilitated as modifications to the embedded shell script will be executed before the main process.
 
-NOTE: Although launching multiple processes using the entrypoint is possible, it is recommended that a process control system be used instead; such as [supervisord](http://supervisord.org/).
+NOTE: Although launching multiple processes using the entrypoint is possible, it is recommended that a process control system be used instead; such as [supervisord](https://supervisord.org/).
 
 ### Entrypoint Script
 
