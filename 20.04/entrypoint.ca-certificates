@@ -6,17 +6,22 @@ set -e
 if [[ ! -e "$EP_RUN" ]] ; then
 	log "Configuring $(basename $0) for first run ..."
 
-	log "Importing SSL certificates ..."
-	SAVEIFS=$IFS
-	IFS=$(echo -en "\n\b")
-	for i in $(ls /usr/share/ca-certificates/docker/)
-	do
-		log "	$i"
-		echo "docker/$i" >> /etc/ca-certificates.conf
-	done
-	IFS=$SAVEIFS
+	path=/etc/ssl/certs/ca-certificates.crt
+	if mountpoint --quiet "${path}" ; then
+		log "Skipping certificate import; ${path} is a mountpoint."
+	else
+		log "Importing SSL certificates ..."
+		SAVEIFS=$IFS
+		IFS=$(echo -en "\n\b")
+		for i in $(ls /usr/share/ca-certificates/docker/)
+		do
+			log "	$i"
+			echo "docker/$i" >> /etc/ca-certificates.conf
+		done
+		IFS=$SAVEIFS
 
-	log "Updating CA certificates ..."
-	update-ca-certificates
+		log "Updating CA certificates ..."
+		update-ca-certificates
+	fi
 fi
 

@@ -1,5 +1,16 @@
 FROM ubuntu:16.04
-LABEL maintainer "Richard Davis <crashvb@gmail.com>"
+ARG org_opencontainers_image_created=undefined
+ARG org_opencontainers_image_revision=undefined
+LABEL \
+	org.opencontainers.image.authors="Richard Davis <crashvb@gmail.com>" \
+	org.opencontainers.image.base.name="ubuntu:16.04" \
+	org.opencontainers.image.created="${org_opencontainers_image_created}" \
+	org.opencontainers.image.description="Custom base image with tooling to support derivations." \
+	org.opencontainers.image.licenses="Apache-2.0" \
+	org.opencontainers.image.source="https://github.com/crashvb/base-docker" \
+	org.opencontainers.image.revision="${org_opencontainers_image_revision}" \
+	org.opencontainers.image.title="crashvb/base" \
+	org.opencontainers.image.url="https://github.com/crashvb/base-docker"
 
 USER root
 
