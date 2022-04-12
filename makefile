@@ -3,7 +3,7 @@
 include makefile.config
 -include makefile.config.local
 
-.PHONY: build-% debug-% default logs remove run-% shell start status stop test
+.PHONY: build-% debug-% default logs remove run-% shell start status stop test-% test-code-%
 
 build-%: %/Dockerfile
 	docker build --force-rm=true --tag=$(registry)$(namespace)/$(image):$*-$(tag) $(buildargs) $(ARGS) $*
@@ -46,7 +46,7 @@ status:
 stop:
 	docker stop $(ARGS) $(name)
 
-test-%:
+test-%: test
 	docker create \
 		--name=$(name)-test \
 		--rm=true \
@@ -57,3 +57,13 @@ test-%:
 		$(ARGS)
 	docker cp test $(name)-test:/
 	docker start --attach=true $(name)-test
+
+test-code-%: %/Dockerfile
+	docker run \
+		--interactive=true \
+		--rm=true \
+		hadolint/hadolint:latest-debian \
+		hadolint \
+		$(ARGS) \
+		- \
+		< $*/Dockerfile

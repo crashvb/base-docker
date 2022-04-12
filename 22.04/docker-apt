@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e
+
+/sbin/docker-apt-install $@
+/sbin/docker-apt-clean

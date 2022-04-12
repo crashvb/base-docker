@@ -1,9 +1,9 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 ARG org_opencontainers_image_created=undefined
 ARG org_opencontainers_image_revision=undefined
 LABEL \
 	org.opencontainers.image.authors="Richard Davis <crashvb@gmail.com>" \
-	org.opencontainers.image.base.name="ubuntu:20.04" \
+	org.opencontainers.image.base.name="ubuntu:22.04" \
 	org.opencontainers.image.created="${org_opencontainers_image_created}" \
 	org.opencontainers.image.description="Custom base image with tooling to support derivations." \
 	org.opencontainers.image.licenses="Apache-2.0" \

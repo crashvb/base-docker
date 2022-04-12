@@ -1,5 +1,10 @@
 # base-docker
 
+[![version)](https://img.shields.io/docker/v/crashvb/base/22.04)](https://hub.docker.com/repository/docker/crashvb/base)
+[![image size](https://img.shields.io/docker/image-size/crashvb/base/22.04)](https://hub.docker.com/repository/docker/crashvb/base)
+[![linting](https://img.shields.io/badge/linting-hadolint-yellow)](https://github.com/hadolint/hadolint)
+[![license](https://img.shields.io/github/license/crashvb/base-docker.svg)](https://github.com/crashvb/base-docker/blob/master/LICENSE.md)
+
 ## Overview
 
 This docker image is a custom base image.
@@ -34,16 +39,16 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 
 #### Environment Variables for Sub-scripts
 
-* <tt>EP_PWGEN_LENGTH</tt> - The length of randomly generated passwords (default: `64`).
-* <tt>EP_RUN</tt> - The fully-qualified path to the entrypoint run file: `/var/local/container_initialized`.
-* <tt>EP_SECRETS_ROOT</tt> - The directory in which docker secrets are mounted. (default: `/run/secrets`).
-* <tt>EP_USER</tt> - The name of the user as which to execute `CMD`.
+* <tt>EP\_PWGEN\_LENGTH</tt> - The length of randomly generated passwords (default: `64`).
+* <tt>EP\_RUN</tt> - The fully-qualified path to the entrypoint run file: `/var/local/container_initialized`.
+* <tt>EP\_SECRETS\_ROOT</tt> - The directory in which docker secrets are mounted. (default: `/run/secrets`).
+* <tt>EP\_USER</tt> - The name of the user as which to execute `CMD`.
 
 #### Exported Functions for Sub-scripts
 
 * <tt>log</tt> - Logs to standard output.
-* <tt>generate_password</tt> - Generates a random password.
-* <tt>render_template</tt> - Renders a given bash template.
+* <tt>generate\_password</tt> - Generates a random password.
+* <tt>render\_template</tt> - Renders a given bash template.
 
 #### Sample Entrypoint Script
 
@@ -119,13 +124,13 @@ For that purpose, three scripts have been embedded in the base image:
 
 ### Environment Variables for docker-apt-install
 
-* APT_ALL_REPOS - If defined, all configured repositories will be enabled before installing packges.
+* APT\_ALL\_REPOS - If defined, all configured repositories will be enabled before installing packges.
 
 ## Organization-wide Customizations
 
 As of yet, this images does not contain any customizations; however, in the future it could contain common packages or initialization scripts. Typical uses could include:
 
-* Generation and / or distribution of SSH authorized_keys and known_hosts files.
+* Generation and / or distribution of SSH authorized\_keys and known\_hosts files.
 
 ## Standard Configuration
 

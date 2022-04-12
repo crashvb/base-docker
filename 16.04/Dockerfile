@@ -12,22 +12,24 @@ LABEL \
 	org.opencontainers.image.title="crashvb/base" \
 	org.opencontainers.image.url="https://github.com/crashvb/base-docker"
 
+# hadolint ignore=DL3002
 USER root
 
 # Install packages, download files ...
-ADD docker-* entrypoint healthcheck /sbin/
-ADD entrypoint.sh /usr/local/lib/
+COPY docker-* entrypoint healthcheck /sbin/
+COPY entrypoint.sh /usr/local/lib/
 RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget vim
 
 # Configure: bash profile
 RUN sed --in-place --expression="/^HISTSIZE/s/1000/9999/" --expression="/^HISTFILESIZE/s/2000/99999/" /root/.bashrc && \
-	echo "set -o vi" >> /root/.bashrc && \
-	echo "PS1='\${debian_chroot:+(\$debian_chroot)}\\\\t \[\\\\033[0;31m\]\u\[\\\\033[00m\]@\[\\\\033[7m\]\h\[\\\\033[00m\] [\w]\\\\n\$ '" >> /root/.bashrc && \
+	printf "set -o vi\n" >> /root/.bashrc && \
+	printf "PS1='\${debian_chroot:+(\$debian_chroot)}\\\\t \[\\\\033[0;31m\]\u\[\\\\033[00m\]@\[\\\\033[7m\]\h\[\\\\033[00m\] [\w]\\\\n\$ '\n" >> /root/.bashrc && \
 	touch ~/.hushlogin
 
 # Configure: entrypoint, ca-certificates
+# hadolint ignore=SC2174
 RUN mkdir --mode=0755 --parents /etc/entrypoint.d/ /etc/healthcheck.d/ /usr/share/ca-certificates/docker/
-ADD entrypoint.ca-certificates /etc/entrypoint.d/00ca-certificates
+COPY entrypoint.ca-certificates /etc/entrypoint.d/00ca-certificates
 
 HEALTHCHECK CMD /sbin/healthcheck
 
