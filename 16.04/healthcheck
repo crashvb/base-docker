@@ -2,16 +2,16 @@
 
 source /usr/local/lib/entrypoint.sh
 
-set -e
+set -e -o pipefail
+shopt -s nullglob
 
 # Wait for the container to finish initializing
-if [[ -e "$EP_RUN" ]] ; then
+if [[ -e "${EP_RUN}" ]] ; then
 	for i in /etc/healthcheck.d/*
 	do
-		if [[ -f $i && -x $i ]] ; then
-			log "Invoking: $(basename $i) ..."
-			$i "$@"
-			[[ $? -ne 0 ]] && exit $?
+		if [[ -f "${i}" && -x "${i}" ]] ; then
+			log "Invoking: $(basename "${i}") ..."
+			${i} "$@" || exit $?
 		fi
 	done
 fi

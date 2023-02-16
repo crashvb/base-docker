@@ -56,7 +56,7 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 #!/bin/bash
 # /etc/entrypoint.d/foo
 
-set -e
+set -e -o pipefail
 
 # Configure: foo
 if [[ ! -e $EP_RUN ]] ; then
@@ -96,7 +96,7 @@ The emedded healthcheck script is located at `/sbin/healthcheck` and performs th
 #!/bin/bash
 # /etc/healthcheck.d/foo
 
-set -e
+set -e -o pipefail
 
 log "Checking if $(basename $0) is healthy ..."
 ps --pid=1
