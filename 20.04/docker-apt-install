@@ -3,7 +3,7 @@
 set -e -o pipefail
 
 if [[ -n "${APT_ALL_REPOS}" ]] ; then
-	codename=$(grep ^VERSION_CODENAME /etc/os-release | awk --field-separator= '{print $2}')
+	codename=$(grep ^VERSION_CODENAME /etc/os-release | awk -F= '{print $2}')
 	cat <<-END > /etc/apt/sources.list
 		deb http://archive.ubuntu.com/ubuntu ${codename} main restricted universe multiverse
 		deb-src http://archive.ubuntu.com/ubuntu ${codename} main restricted universe multiverse
