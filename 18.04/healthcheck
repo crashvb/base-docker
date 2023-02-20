@@ -16,5 +16,6 @@ if [[ -e "${EP_RUN}" ]] ; then
 	done
 fi
 
+log "Completed."
 exit 0
 

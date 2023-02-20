@@ -45,11 +45,26 @@ generate_password test3
 [[ -s "${EP_SECRETS_ROOT}/test3_password" ]] && grep --quiet test3 "${EP_SECRETS_ROOT}/test3_password"
 
 log "Checking entrypoint::generate_rsakey ..."
-prefix="mYpReFiX"
-generate_rsakey "${prefix}"
-[[ -f "${EP_SECRETS_ROOT}/${prefix,,}ca.crt" ]]
-[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.crt" ]]
-[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.key" ]]
+prefix1="mYpReFiX"
+prefix2="prefix 2"
+prefix3="prefix3"
+cn="My custom CN"
+generate_rsakey "${prefix1}"
+generate_rsakey "${prefix2}" "${cn}"
+subject_alt_name="www.www.com"
+echo "subjectAltName=DNS:${subject_alt_name}" > "/dev/shm/${prefix3}.ext"
+generate_rsakey "${prefix3}"
+for prefix in "${prefix1}" "${prefix2}" "${prefix3}"; do
+	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}ca.crt" ]]
+	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.crt" ]]
+	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.key" ]]
+done
+[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout -subject)" =~ "${prefix1,,} server" ]]
+[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout )" =~ "localhost" ]]
+[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout -subject)" =~ "${cn}" ]]
+[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout )" =~ "localhost" ]]
+[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout -subject)" =~ "${prefix3,,} server" ]]
+[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout )" =~ "${subject_alt_name}" ]]
 
 log "Checking entrypoint::render_template ..."
 template="$(mktemp)"

@@ -10,7 +10,7 @@ export EP_SSH_KEY_LENGTH=${EP_SSH_KEY_LENGTH:-8192}
 
 function log
 {
-	echo -e "$(date +%Y-%m-%d_%H:%M:%S) | $(basename "${0}") |" "$@"
+	echo -e "$(date +%Y-%m-%d_%H:%M:%S) | $(basename -- "${0}") |" "$@"
 }
 export -f log
 
@@ -30,14 +30,14 @@ function generate_gpgkey
 {
 	ensure_secrets_root
 
-	key="${1,,}.gpg"
-	secrets="${EP_SECRETS_ROOT}/${key}"
+	local key="${1,,}.gpg"
+	local secrets="${EP_SECRETS_ROOT}/${key}"
 
 	export GNUPGHOME="$(eval echo ~"${1,,}")/.gnupg"
 
 	mkdir --mode=0700 --parents "${GNUPGHOME}"
 
-	tmp=$(gpg --list-secret-keys 2>/devnull)
+	local tmp=$(gpg --list-secret-keys 2>/devnull)
 	if [[ -e "${secrets}" ]] ; then
 		log "Importing ${key} from secrets ..."
 		gpg --allow-secret-key-import --import --verbose "${secrets}"
@@ -66,8 +66,8 @@ function generate_password
 {
 	ensure_secrets_root
 
-	secrets="${EP_SECRETS_ROOT}/${1,,}_password"
-	var="${1^^}_PASSWORD"
+	local secrets="${EP_SECRETS_ROOT}/${1,,}_password"
+	local var="${1^^}_PASSWORD"
 
 	if [[ -e "${secrets}" ]] ; then
 		log "Importing ${var} from secrets ..."
@@ -85,11 +85,13 @@ function generate_password
 export -f generate_password
 
 # 1 - prefix
+# 2 - server cn
 function generate_rsakey
 {
 	ensure_secrets_root
 
-	prefix="${1,,}"
+	local prefix="${1,,}"
+	local cn="${2:-"${prefix} server"}"
 
 	if [[ -e ${EP_SECRETS_ROOT}/${prefix}ca.crt && -e ${EP_SECRETS_ROOT}/${prefix}.crt && -e ${EP_SECRETS_ROOT}/${prefix}.key ]] ; then
 		log "Importing ${prefix}ca.crt, ${prefix}.crt, and ${prefix}.key from secrets ..."
@@ -108,7 +110,7 @@ function generate_rsakey
 			-nodes \
 			-out "${EP_SECRETS_ROOT}/${prefix}ca.crt" \
 			-sha256 \
-			-subj "/CN=${prefix} ca" \
+			-subj "/CN=${prefix} certificate authority" \
 			-x509
 
 		log "	server certificate"
@@ -121,18 +123,22 @@ function generate_rsakey
 			-nodes \
 			-out "/dev/shm/${prefix}.csr" \
 			-sha256 \
-			-subj "/CN=${prefix} server"
+			-subj "/CN=${cn}" \
+		# Allow calling scripts to stage an extentions file prior to invoking
+		[[ ! -e "/dev/shm/${prefix}.ext" ]] && echo "subjectAltName=DNS:localhost,IP:127.0.0.1" > "/dev/shm/${prefix}.ext"
 		openssl x509 \
 			-CA "${EP_SECRETS_ROOT}/${prefix}ca.crt" \
 			-CAkey "/dev/shm/${prefix}ca.key" \
 			-CAcreateserial \
 			-days "${EP_RSA_CERT_DAYS}" \
+			-extfile "/dev/shm/${prefix}.ext" \
 			-in "/dev/shm/${prefix}.csr" \
 			-out "${EP_SECRETS_ROOT}/${prefix}.crt" \
 			-req \
 			-sha256
 
-		rm --force /dev/shm/{"${prefix}ca.key","${prefix}.csr"} "${EP_SECRETS_ROOT}/${prefix}ca.srl"
+		# Delete the CA key as we do not take responsibility for extended PKI functions!
+		rm --force /dev/shm/"${prefix}"{ca.key,.csr,.ext} "${EP_SECRETS_ROOT}/${prefix}ca.srl"
 
 	fi
 	[[ -n "$(getent group ssl-cert)" ]] && group=ssl-cert || group=root
@@ -147,9 +153,9 @@ function generate_sshkey
 	ensure_secrets_root
 
 	# Note: ssh-keygen -f id_rsa -y > id_rsa.pub
-	key="id_rsa.${1,,}"
-	secrets="${EP_SECRETS_ROOT}/${key}"
-	userkey="$(eval echo ~"${1,,}")/.ssh/id_rsa"
+	local key="id_rsa.${1,,}"
+	local secrets="${EP_SECRETS_ROOT}/${key}"
+	local userkey="$(eval echo ~"${1,,}")/.ssh/id_rsa"
 
 	mkdir --parents "$(dirname "${userkey}")"
 
