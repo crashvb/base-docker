@@ -16,7 +16,7 @@ LABEL \
 USER root
 
 # Install packages, download files ...
-COPY docker-* entrypoint healthcheck /sbin/
+COPY apt-add-repo docker-* entrypoint healthcheck /sbin/
 COPY entrypoint.sh /usr/local/lib/
 RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget vim
 
