@@ -142,9 +142,10 @@ As of yet, this images does not contain any customizations; however, in the futu
 │  ├─ entrypoint.d/
 │  └─ healthcheck.d/
 ├─ sbin/
-│  ├─ docker-yum
-│  ├─ docker-yum-clean
-│  ├─ docker-yum-install
+│  ├─ apt-add-repo
+│  ├─ docker-apt
+│  ├─ docker-apt-clean
+│  ├─ docker-apt-install
 │  ├─ entrypoint
 │  ├─ entrypoint.ca-certificates
 │  └─ healthcheck
