@@ -1,96 +1,338 @@
 #!/bin/bash
 
-set -e -o pipefail
-
 # Smaller for testing ...
-export EP_GPG_KEY_LENGTH=2048
-export EP_RSA_KEY_LENGTH=2048
-export EP_SSH_KEY_LENGTH=2048
+export EP_RSA_KEY_SIZE=2048
+export GPG_TTY=$(tty)
 
 log "Installing test-prerequisits ..."
-#docker-apt gnupg openssh-client
-docker-apt openssh-client
+docker-apt gnupg openssh-client shunit2
 
-log "Checking docker-apt-install ..."
-for i in apt-transport-https ca-certificates curl gettext pwgen wget vim ; do
-	log "	${i}"
-	dpkg-query -W --showformat='${Status}\n' $i | grep "install ok installed" > /dev/null
-done
+function dstring()
+{
+	echo "$@$(date +%Y%m%d%H%M%S)"
+}
 
-log "Checking docker-apt-clean ..."
-for i in /tmp /usr/share/{info,lintian,man} /var/lib/apt/lists /var/tmp ; do
-	log "	${i}"
-	[[ ! "$(ls --almost-all ${i})" ]]
-done
+function testDockerAptInstall()
+{
+	for i in apt-transport-https ca-certificates curl gettext-base pwgen wget vim ; do
+		dpkg-query -W --showformat='${Status}\n' $i | grep --quiet "install ok installed"
+		assertTrue "package is present: ${i}" $?
+	done
+}
 
-#log "Checking entrypoint::generate_gpgkey ..."
-#generate_gpgkey "mysecretname" "myrealname" "myemail"
-#gpg --list-keys | grep "mysecretname"
-#gpg --list-keys | grep "myrealname"
-#gpg --list-keys | grep "myemail"
+function testDockerAptClean()
+{
+	for i in /tmp /usr/share/{info,lintian,man} /var/lib/apt/lists /var/tmp ; do
+		# Note: shunit2 keeps state in /tmp
+		[[ -z "$(ls --almost-all ${i} | grep --invert-match shunit)" ]]
+		assertTrue "directory is emptry: ${i}" $?
+	done
+}
 
-log "Checking entrypoint::generate_password ..."
-log "	environment"
-export TEST1_PASSWORD=test1
-generate_password test1
-[[ -s "${EP_SECRETS_ROOT}/test1_password" ]] && grep --quiet test1 "${EP_SECRETS_ROOT}/test1_password"
+function testEPGenerateGPGKey()
+{
+	local gpgsecretname="$(dstring "secretName")"
+	local gpgname="$(dstring "realName")"
+	local gpgemail="$(dstring "eMail")"
+	local username="$(dstring "user")"
+	useradd "${username}"
+	generate_password "${gpgsecretname}_gpg"
 
-log "	generated"
-generate_password test2
-[[ -s "${EP_SECRETS_ROOT}/test2_password" ]] && [[ ${#TEST2_PASSWORD} -eq ${EP_PWGEN_LENGTH} ]]
+	# Generate a key from nothing ...
+	generate_gpgkey "${gpgsecretname}" "${gpgname}" "${gpgemail}" "${username}"
 
-log "	secrets"
-echo test3 > "${EP_SECRETS_ROOT}/test3_password"
-generate_password test3
-[[ -s "${EP_SECRETS_ROOT}/test3_password" ]] && grep --quiet test3 "${EP_SECRETS_ROOT}/test3_password"
+	local gpgdir="/home/${username}/.gnupg"
+	[[ -d "${gpgdir}" ]]
+	assertTrue "gnupghome exists: ${gpgdir}" $?
 
-log "Checking entrypoint::generate_rsakey ..."
-prefix1="mYpReFiX"
-prefix2="prefix 2"
-prefix3="prefix3"
-cn="My custom CN"
-generate_rsakey "${prefix1}"
-generate_rsakey "${prefix2}" "${cn}"
-subject_alt_name="www.www.com"
-echo "subjectAltName=DNS:${subject_alt_name}" > "/dev/shm/${prefix3}.ext"
-generate_rsakey "${prefix3}"
-for prefix in "${prefix1}" "${prefix2}" "${prefix3}"; do
-	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}ca.crt" ]]
-	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.crt" ]]
-	[[ -f "${EP_SECRETS_ROOT}/${prefix,,}.key" ]]
-done
-[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout -subject)" =~ "${prefix1,,} server" ]]
-[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout )" =~ "localhost" ]]
-[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout -subject)" =~ "${cn}" ]]
-[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout )" =~ "localhost" ]]
-[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout -subject)" =~ "${prefix3,,} server" ]]
-[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout )" =~ "${subject_alt_name}" ]]
+	[[ -s "${EP_SECRETS_ROOT}/${gpgsecretname,,}.gpg" ]]
+	assertTrue "secret exists: ${gpgsecretname}" $?
 
-log "Checking entrypoint::render_template ..."
-template="$(mktemp)"
-instantiation="$(mktemp --dry-run)"
+	gpg --list-keys | grep --quiet "${gpgname}"
+	assertTrue "key contains: ${gpgname}" $?
 
-cat <<- EOF > "${template}.template"
-test1 value here >>> \${TEST1_PASSWORD} <<< test1 value here
-test2 value here >>> \${TEST2_PASSWORD} <<< test2 value here
-test3 value here >>> \${TEST3_PASSWORD} <<< test3 value here
-EOF
+	gpg --list-keys | grep --quiet "${gpgemail}"
+	assertTrue "key contains: ${gpgemail}" $?
 
-render_template "${template}" "${instantiation}"
-[[ -f "${instantiation}" ]] && \
-	grep "${TEST1_PASSWORD}" "${instantiation}" && \
-	grep "${TEST2_PASSWORD}" "${instantiation}" && \
-	grep "${TEST3_PASSWORD}" "${instantiation}"
+	# Import a key from secrets ...
+	rm --force --recursive "/home/${username}/.gnupg"
+	generate_gpgkey "${gpgsecretname}" "${gpgname}" "${gpgemail}" "${username}"
 
-log "Checking entrypoint::generate_sshkey ..."
-generate_sshkey "root"
-[[ -f "${EP_SECRETS_ROOT}/id_rsa.root" ]]
-[[ -s /root/.ssh/id_rsa ]]
-useradd user1
-generate_sshkey "user1"
-[[ -f "${EP_SECRETS_ROOT}/id_rsa.user1" ]]
-[[ -s /home/user1/.ssh/id_rsa ]]
+	[[ -d "${gpgdir}" ]]
+	assertTrue "gnupghome exists: ${gpgdir}" $?
 
-log "--- Test Passed ---"
-exit 0
+	gpg --list-keys | grep --quiet "${gpgname}"
+	assertTrue "key contains: ${gpgname}" $?
+
+	gpg --list-keys | grep --quiet "${gpgemail}"
+	assertTrue "key contains: ${gpgemail}" $?
+
+	# Export an existing key to secrets ...
+	rm --force "${EP_SECRETS_ROOT}/${gpgsecretname,,}.gpg"
+	generate_gpgkey "${gpgsecretname}" "${gpgname}" "${gpgemail}" "${username}"
+
+	[[ -s "${EP_SECRETS_ROOT}/${gpgsecretname,,}.gpg" ]]
+	assertTrue "secret exists: ${gpgsecretname}" $?
+
+	gpg --list-keys | grep --quiet "${gpgname}"
+	assertTrue "key contains: ${gpgname}" $?
+
+	gpg --list-keys | grep --quiet "${gpgemail}"
+	assertTrue "key contains: ${gpgemail}" $?
+
+	# Null password ...
+	local gpgsecretname2="$(dstring "secretName2")"
+	local username2="$(dstring "user2")"
+	useradd "${username2}"
+	generate_gpgkey "${gpgsecretname2}" "${gpgname}" "${gpgemail}" "${username2}"
+
+	local gpgdir="/home/${username2}/.gnupg"
+	[[ -d "${gpgdir}" ]]
+	assertTrue "gnupghome exists: ${gpgdir}" $?
+
+	[[ -s "${EP_SECRETS_ROOT}/${gpgsecretname2,,}.gpg" ]]
+	assertTrue "secret exists: ${gpgsecretname2}" $?
+
+	gpg --list-keys | grep --quiet "${gpgname}"
+	assertTrue "key contains: ${gpgname}" $?
+
+	gpg --list-keys | grep --quiet "${gpgemail}"
+	assertTrue "key contains: ${gpgemail}" $?
+}
+
+function testEPGeneratePassword()
+{
+	# Import a password from environment ...
+	export TEST1_PASSWORD="$(dstring "environment")"
+	generate_password test1
+
+	[[ -s "${EP_SECRETS_ROOT}/test1_password" ]]
+	assertTrue "secret exists: environment" $?
+
+	grep --quiet "${TEST1_PASSWORD}" "${EP_SECRETS_ROOT}/test1_password"
+	assertTrue "secret contains: environment" $?
+
+	# Generate password from nothing ...
+	generate_password test2
+
+	[[ -s "${EP_SECRETS_ROOT}/test2_password" ]]
+	assertTrue "secret exists: generated" $?
+
+	grep --quiet "${TEST2_PASSWORD}" "${EP_SECRETS_ROOT}/test2_password"
+	assertTrue "secret correct: generated" $?
+
+	[[ ${#TEST2_PASSWORD} -eq ${EP_PWGEN_LENGTH} ]]
+	assertTrue "secret length: generated" $?
+
+	# Import a key from secrets ...
+	local test3_pw="$(dstring "secrets")"
+	echo "${test3_pw}" > "${EP_SECRETS_ROOT}/test3_password"
+	generate_password test3
+
+	[[ -s "${EP_SECRETS_ROOT}/test3_password" ]]
+	assertTrue "secret exists: secrets" $?
+
+	[[ "${TEST3_PASSWORD}" == "${test3_pw}" ]]
+	assertTrue "environment  correct: secrets" $?
+
+	grep --quiet "${test3_pw}" "${EP_SECRETS_ROOT}/test3_password"
+	assertTrue "secret correct: secrets" $?
+}
+
+function basic_rsa_checks()
+{
+	[[ -f "${EP_SECRETS_ROOT}/${1,,}ca.crt" ]]
+	assertTrue "ca certificate exists: ${1}" $?
+
+	[[ ! -f "${EP_SECRETS_ROOT}/${1,,}ca.key" ]]
+	assertTrue "ca key does not exists: ${1}" $?
+
+	[[ -f "${EP_SECRETS_ROOT}/${1,,}.crt" ]]
+	assertTrue "server certificate exists: ${1}" $?
+
+	[[ -f "${EP_SECRETS_ROOT}/${1,,}.key" ]]
+	assertTrue "server key exists: ${1}" $?
+
+	openssl verify -CAfile "${EP_SECRETS_ROOT}/${1,,}ca.crt" "${EP_SECRETS_ROOT}/${1,,}.crt"
+	assertTrue "ca issued certificate: ${1}" $?
+
+	local not_after="$(date --date="$( \
+		openssl x509 -in "${EP_SECRETS_ROOT}/${1,,}.crt" -noout -enddate | \
+		awk -F= '{print $2}')" +%s)"
+	local end_date="$(date --date="+${EP_VALIDITY_DAYS} days" +%s)"
+	local variance="$((${end_date} - ${not_after}))"
+	[[ "${variance#-}" -lt 900 ]] 
+	assertTrue "server end date (+/- 15 minutes): ${1}" $?
+}
+
+function testEPGenerateRSAKey()
+{
+	# Generate a key with defaults ...
+	local prefix1="$(dstring "mYpReFiX")"
+	generate_password "${prefix1}_rsa"
+	generate_rsakey "${prefix1}"
+
+	# Generate a key with a custom CN ...
+	local cn="$(dstring "My custom CN")"
+	local prefix2="$(dstring "prefix2")"
+	generate_password "${prefix2}_rsa"
+	generate_rsakey "${prefix2}" "${cn}"
+
+	# Generate a key with a SAN ...
+	local prefix3="$(dstring "prefix3")"
+	local subject_alt_name="www.www.com"
+	echo "subjectAltName=DNS:${subject_alt_name}" > "/dev/shm/${prefix3}.ext"
+	generate_password "${prefix3}_rsa"
+	generate_rsakey "${prefix3}"
+
+	for prefix in "${prefix1}" "${prefix2}" "${prefix3}"; do
+		basic_rsa_checks "${prefix}"
+
+		local passphrase="$(eval echo "\$${prefix^^}_RSA_PASSWORD")"
+		diff \
+			<(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix,,}.crt" -modulus -noout | sha256sum) \
+			<(openssl rsa -in "${EP_SECRETS_ROOT}/${prefix,,}.key" -modulus -noout -passin "pass:${passphrase}" | sha256sum)
+		assertTrue "server keys are paired: ${prefix}" $?
+	done
+
+	[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout -subject)" =~ "${prefix1,,} server" ]]
+	assertTrue "server common name: ${prefix1}" $?
+
+	[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix1,,}.crt" -noout )" =~ "localhost" ]]
+	assertTrue "server subject alternative name: ${prefix1}" $?
+
+	[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout -subject)" =~ "${cn}" ]]
+	assertTrue "server common name: ${prefix2}" $?
+
+	[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix2,,}.crt" -noout )" =~ "localhost" ]]
+	assertTrue "server subject alternative name: ${prefix2}" $?
+
+	[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout -subject)" =~ "${prefix3,,} server" ]]
+	assertTrue "server common name: ${prefix3}" $?
+
+	[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix3,,}.crt" -noout )" =~ "${subject_alt_name}" ]]
+	assertTrue "server subject alternative name: ${prefix3}" $?
+
+	# Null password ...
+	local prefix4="$(dstring "prefix4")"
+	generate_rsakey "${prefix4}"
+
+	basic_rsa_checks "${prefix4}"
+
+	diff \
+		<(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix4}.crt" -modulus -noout | sha256sum) \
+		<(openssl rsa -in "${EP_SECRETS_ROOT}/${prefix4}.key" -modulus -noout | sha256sum)
+	assertTrue "server keys are paired: ${prefix4}" $?
+
+	[[ "$(openssl x509 -in "${EP_SECRETS_ROOT}/${prefix4,,}.crt" -noout -subject)" =~ "${prefix4,,} server" ]]
+	assertTrue "server common name: ${prefix4}" $?
+
+	[[ "$(openssl x509 -ext subjectAltName -in "${EP_SECRETS_ROOT}/${prefix4,,}.crt" -noout )" =~ "localhost" ]]
+	assertTrue "server subject alternative name: ${prefix4}" $?
+}
+
+function testEPRenderTemplate()
+{
+	local template="$(mktemp)"
+	local instantiation="$(mktemp --dry-run)"
+	export FOO="$(dstring "someRANDOMvalue")"
+	cat <<- EOF > "${template}.template"
+		test value here >>> \${FOO} <<< test value here
+		other value here >>> \${BAR} <<< other value here
+	EOF
+
+	# Render a template attempting to populate all vars ...
+	render_template "${template}" "${instantiation}"
+
+	[[ -f "${instantiation}" ]]
+	assertTrue "template exists: ${instantiation}" $?
+
+	grep --quiet "${FOO}" "${instantiation}"
+	assertTrue "template contains: ${FOO}" $?
+
+	! grep --quiet "FOO" "${instantiation}"
+	assertTrue "template does not contain: FOO" $?
+
+	! grep --quiet "BAR" "${instantiation}"
+	assertTrue "template does not contain: BAR" $?
+
+	grep --quiet "test value here" "${instantiation}"
+	assertTrue "template is populated: all vars" $?
+
+	# Render a template populating select vars ...
+	export BAR="$(dstring "someOTHERrandomVALUE")"
+	rm --force  "${instantiation}"
+	render_template "${template}" "${instantiation}" "\$BAR"
+
+	[[ -f "${instantiation}" ]]
+	assertTrue "template exists: ${instantiation}" $?
+
+	! grep --quiet "${FOO}" "${instantiation}"
+	assertTrue "template does not contain: ${FOO}" $?
+
+	grep --quiet "\${FOO}" "${instantiation}"
+	assertTrue "template contains: \${FOO}" $?
+
+	grep --quiet "${BAR}" "${instantiation}"
+	assertTrue "template contains: ${BAR}" $?
+
+	! grep --quiet "BAR" "${instantiation}"
+	assertTrue "template does not contain: BAR" $?
+
+	grep --quiet "test value here" "${instantiation}"
+	assertTrue "template is populated: select vars" $?
+}
+
+function testGenerateSSHKey()
+{
+	generate_password "root_ssh"
+
+	# Generate a key from nothing ...
+	generate_sshkey "root"
+
+	[[ -f "${EP_SECRETS_ROOT}/id_rsa.root" ]]
+	assertTrue "secret exists: root" $?
+
+	[[ -s /root/.ssh/id_rsa ]]
+	assertTrue "key exists: root" $?
+
+	# Import a key from secrets ...
+	rm --force /root/.ssh/id_rsa
+	generate_sshkey "root"
+
+	[[ -s /root/.ssh/id_rsa ]]
+	assertTrue "key exists: root" $?
+
+	# Export an existing key to secrets ...
+	mv "${EP_SECRETS_ROOT}/id_rsa.root" /root/.ssh/id_rsa
+	generate_sshkey "root"
+
+	[[ -f "${EP_SECRETS_ROOT}/id_rsa.root" ]]
+	assertTrue "secret exists: root" $?
+
+	# Generate a key for a user ...
+	username="$(dstring "user")"
+	useradd "${username}"
+	generate_password "${username}_ssh"
+	generate_sshkey "${username}"
+
+	[[ -f "${EP_SECRETS_ROOT}/id_rsa.${username}" ]]
+	assertTrue "secret exists: ${username}" $?
+
+	[[ -s "/home/${username}/.ssh/id_rsa" ]]
+	assertTrue "key exists: ${username}" $?
+
+	# Null password ...
+	username2="$(dstring "user2")"
+	useradd "${username2}"
+	generate_sshkey "${username2}"
+
+	[[ -f "${EP_SECRETS_ROOT}/id_rsa.${username2}" ]]
+	assertTrue "secret exists: ${username2}" $?
+
+	[[ -s "/home/${username}/.ssh/id_rsa" ]]
+	assertTrue "key exists: ${username2}" $?
+}
+
+source /usr/bin/shunit2
 

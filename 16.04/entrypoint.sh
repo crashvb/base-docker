@@ -1,12 +1,12 @@
 #!/bin/bash
 
-export EP_GPG_KEY_LENGTH=${EP_GPG_KEY_LENGTH:-8192}
 export EP_PWGEN_LENGTH=${EP_PWGEN_LENGTH:-64}
-export EP_RSA_KEY_LENGTH=${EP_RSA_KEY_LENGTH:-8192}
-export EP_RSA_CERT_DAYS=${EP_RSA_CERT_DAYS:-30}
+export EP_RSA_KEY_SIZE=${EP_RSA_KEY_SIZE:-8192}
 export EP_RUN=/var/local/container_initialized
 export EP_SECRETS_ROOT=${EP_SECRETS_ROOT:-/run/secrets}
-export EP_SSH_KEY_LENGTH=${EP_SSH_KEY_LENGTH:-8192}
+export EP_SSH_KEY_SIZE=${EP_SSH_KEY_SIZE:-${EP_RSA_KEY_SIZE}}
+export EP_SSH_KEY_TYPE=${EP_SSH_KEY_TYPE:-rsa}
+export EP_VALIDITY_DAYS=${EP_VALIDITY_DAYS:-30}
 
 function log
 {
@@ -26,37 +26,51 @@ export -f ensure_secrets_root
 # 1 - secret name
 # 2 - real name
 # 3 - email
+# 4 - user
 function generate_gpgkey
 {
 	ensure_secrets_root
 
 	local key="${1,,}.gpg"
+	local name="${2:-${1,,}}"
+
 	local secrets="${EP_SECRETS_ROOT}/${key}"
+	local user="${4:-${1,,}}"
 
-	export GNUPGHOME="$(eval echo ~"${1,,}")/.gnupg"
-
+	export GNUPGHOME="$(eval echo ~"${4,,}")/.gnupg"
 	mkdir --mode=0700 --parents "${GNUPGHOME}"
 
-	local tmp=$(gpg --list-secret-keys 2>/devnull)
+	# Even though it should be safe to invoke, let the caller do this for edge cases
+	# where the corresponding passphrase should not be stored in $EP_SECRETS_ROOT ...
+	# generate_password "${1,,}_gpg"
+	local passphrase="$(eval echo "\$${1^^}_GPG_PASSWORD")"
+
+	local tmp=$(gpg --list-secret-keys 2> /dev/null)
 	if [[ -e "${secrets}" ]] ; then
 		log "Importing ${key} from secrets ..."
-		gpg --allow-secret-key-import --import --verbose "${secrets}"
-	elif [[ -z "${tmp}" || -n "${tmp}" ]] ; then
-		log "Generating ${key} in secrets ..."
+		gpg --allow-secret-key-import --import --passphrase "${passphrase}" --pinentry-mode loopback --quiet "${secrets}"
+	elif [[ ! "${tmp}" =~ "${name}" ]] ; then
+		log "Generating ${key} in secrets ${passphrase:+[protected]} ..."
 
-		cat <<- EOF | gpg --batch --gen-key --verbose
-			Key-Type: 1
-			Key-Length: ${EP_GPG_KEY_LENGTH}
-			Name-Real: ${2:-${1,,}}
+		# Note: "Passphrase: ${passphrase}" cannot be defined inline with a null passphrase.
+		cat <<- EOF | gpg --batch --gen-key --keyid-format long --passphrase "${passphrase}" --pinentry-mode loopback --verbose
+			Key-Type: RSA
+			Key-Length: ${EP_RSA_KEY_SIZE}
+			Subkey-Type: RSA
+			Subkey-Length: ${EP_RSA_KEY_SIZE}
+			Name-Real: ${name}
 			Name-Email: ${3:-${1,,}@${HOSTNAME}}
-			Expire-Date: 0
+			Expire-Date: ${EP_VALIDITY_DAYS}d
+			%commit
 		EOF
-		gpg --armor --export --output "${secrets}"
-		gpg --armor --export-secret-key >> "${secrets}"
+		gpg --armor --export --output "${secrets}" --quiet
+		gpg --armor --export-secret-key --passphrase="${passphrase}" --pinentry-mode loopback >> "${secrets}"
+		gpg --armor --export-secret-subkeys --passphrase="${passphrase}" --pinentry-mode loopback >> "${secrets}"
 	else
 		log "Importing ${key} from container ..."
-		gpg --armor --export --output "${secrets}"
-		gpg --armor --export-secret-key >> "${secrets}"
+		gpg --armor --export --output "${secrets}" --quiet
+		gpg --armor --export-secret-key --passphrase="${passphrase}" --pinentry-mode loopback >> "${secrets}"
+		gpg --armor --export-secret-subkeys --passphrase="${passphrase}" --pinentry-mode loopback >> "${secrets}"
 	fi
 }
 export -f generate_gpgkey
@@ -99,12 +113,17 @@ function generate_rsakey
 		# Note: Key size must be >= 3072 for "HIGH" security:
 		log "Generating ${prefix}ca.crt, ${prefix}.crt, and ${prefix}.key in secrets ..."
 
+		# Even though it should be safe to invoke, let the caller do this for edge cases
+		# where the corresponding passphrase should not be stored in $EP_SECRETS_ROOT ...
+		# generate_password "${1,,}_rsa"
+		local passphrase="$(eval echo "\$${1^^}_RSA_PASSWORD")"
+
 		log "	certificate authority"
 		openssl genrsa \
 			-out "/dev/shm/${prefix}ca.key" \
-			"${EP_RSA_KEY_LENGTH}"
+			"${EP_RSA_KEY_SIZE}"
 		openssl req \
-			-days "${EP_RSA_CERT_DAYS}" \
+			-days "${EP_VALIDITY_DAYS}" \
 			-key "/dev/shm/${prefix}ca.key" \
 			-new \
 			-nodes \
@@ -113,11 +132,13 @@ function generate_rsakey
 			-subj "/CN=${prefix} certificate authority" \
 			-x509
 
-		log "	server certificate"
+		log "	server certificate ${passphrase:+[protected]}"
 		openssl genrsa \
+			${passphrase:+--aes256 --passout "pass:${passphrase}"} \
 			-out "${EP_SECRETS_ROOT}/${prefix}.key" \
-			"${EP_RSA_KEY_LENGTH}"
+			"${EP_RSA_KEY_SIZE}"
 		openssl req \
+			${passphrase:+--passin "pass:${passphrase}"} \
 			-key "${EP_SECRETS_ROOT}/${prefix}.key" \
 			-new \
 			-nodes \
@@ -130,7 +151,7 @@ function generate_rsakey
 			-CA "${EP_SECRETS_ROOT}/${prefix}ca.crt" \
 			-CAkey "/dev/shm/${prefix}ca.key" \
 			-CAcreateserial \
-			-days "${EP_RSA_CERT_DAYS}" \
+			-days "${EP_VALIDITY_DAYS}" \
 			-extfile "/dev/shm/${prefix}.ext" \
 			-in "/dev/shm/${prefix}.csr" \
 			-out "${EP_SECRETS_ROOT}/${prefix}.crt" \
@@ -163,8 +184,13 @@ function generate_sshkey
 		log "Importing ${key} from secrets ..."
 		ln --force --symbolic "${secrets}" "${userkey}"
 	elif [[ ! -e "${userkey}"  ]] ; then
-		log "Generating ${key} in secrets ..."
-		ssh-keygen -b "${EP_SSH_KEY_LENGTH}" -f "${secrets}" -t rsa -N ""
+		# Even though it should be safe to invoke, let the caller do this for edge cases
+		# where the corresponding passphrase should not be stored in $EP_SECRETS_ROOT ...
+		# generate_password "${1,,}_ssh"
+		local passphrase="$(eval echo "\$${1^^}_SSH_PASSWORD")"
+
+		log "Generating ${key} in secrets ${passphrase:+[protected]} ..."
+		ssh-keygen -b "${EP_SSH_KEY_SIZE}" -f "${secrets}" -t "${EP_SSH_KEY_TYPE}" -N "${passphrase}"
 		ln --symbolic "${secrets}" "${userkey}"
 	else
 		log "Importing ${key} from container ..."

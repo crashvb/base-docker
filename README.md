@@ -40,14 +40,21 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 #### Environment Variables for Sub-scripts
 
 * <tt>EP\_PWGEN\_LENGTH</tt> - The length of randomly generated passwords (default: `64`).
+* <tt>EP\_RSA\_KEY\_SIZE</tt> - Key size of any generated RSA keys (default: `8192`).
 * <tt>EP\_RUN</tt> - The fully-qualified path to the entrypoint run file: `/var/local/container_initialized`.
 * <tt>EP\_SECRETS\_ROOT</tt> - The directory in which docker secrets are mounted. (default: `/run/secrets`).
+* <tt>EP\_SSH\_KEY\_SIZE</tt> - Key size of any generated SSH keys (default: `EP_RSA_KEY_SIZE`).
+* <tt>EP\_SSH\_KEY\_TYPE</tt> - Key type of any generated SSH keys (default: `rsa`).
 * <tt>EP\_USER</tt> - The name of the user as which to execute `CMD`.
+* <tt>EP\_VALIDITY\_DAYS</tt> - Validity period of any generated GnuPG or PKI certificates (default: `30`).
 
 #### Exported Functions for Sub-scripts
 
 * <tt>log</tt> - Logs to standard output.
+* <tt>generate\_gpgkey</tt> - Generates a random GnuPG keypair.
 * <tt>generate\_password</tt> - Generates a random password.
+* <tt>generate\_rsakey</tt> - Generates random RSA keypairs and PKI certificates.
+* <tt>generate\_sshkey</tt> - Generates a random SSH keypair.
 * <tt>render\_template</tt> - Renders a given bash template.
 
 #### Sample Entrypoint Script
@@ -59,9 +66,9 @@ The emedded entrypoint script is located at `/sbin/entrypoint` and performs the 
 set -e -o pipefail
 
 # Configure: foo
-if [[ ! -e $EP_RUN ]] ; then
-	log "Configuring $(basename $0) for first run ..."
-	export VAR1=${VAR1:=VAL1}
+if [[ ! -e "${EP_RUN}" ]] ; then
+	log "Configuring $(basename "${0}") for first run ..."
+	export VAR1="${VAR1:=VAL1}"
 
 	# Interpolate all variables
 	VAR2=VAL2 render_template /usr/local/share/foo.conf /etc/foo/foo.conf
@@ -98,7 +105,7 @@ The emedded healthcheck script is located at `/sbin/healthcheck` and performs th
 
 set -e -o pipefail
 
-log "Checking if $(basename $0) is healthy ..."
+log "Checking if $(basename "${0}") is healthy ..."
 ps --pid=1
 ```
 

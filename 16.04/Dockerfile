@@ -18,7 +18,7 @@ USER root
 # Install packages, download files ...
 COPY apt-add-repo docker-* entrypoint healthcheck /sbin/
 COPY entrypoint.sh /usr/local/lib/
-RUN docker-apt apt-transport-https ca-certificates curl gettext pwgen wget vim
+RUN docker-apt apt-transport-https ca-certificates curl gettext-base pwgen wget vim
 
 # Configure: bash profile
 RUN sed --in-place --expression="/^HISTSIZE/s/1000/9999/" --expression="/^HISTFILESIZE/s/2000/99999/" /root/.bashrc && \
