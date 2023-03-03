@@ -330,8 +330,19 @@ function testGenerateSSHKey()
 	[[ -f "${EP_SECRETS_ROOT}/id_rsa.${username2}" ]]
 	assertTrue "secret exists: ${username2}" $?
 
-	[[ -s "/home/${username}/.ssh/id_rsa" ]]
+	[[ -s "/home/${username2}/.ssh/id_rsa" ]]
 	assertTrue "key exists: ${username2}" $?
+
+	# ED25519 key ...
+	username3="$(dstring "user3")"
+	useradd "${username3}"
+	EP_SSH_KEY_TYPE=ed25519 generate_sshkey "${username3}"
+
+	[[ -f "${EP_SECRETS_ROOT}/id_ed25519.${username3}" ]]
+	assertTrue "secret exists: ${username3}" $?
+
+	[[ -s "/home/${username3}/.ssh/id_ed25519" ]]
+	assertTrue "key exists: ${username3}" $?
 }
 
 source /usr/bin/shunit2

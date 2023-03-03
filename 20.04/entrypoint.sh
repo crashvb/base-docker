@@ -174,9 +174,9 @@ function generate_sshkey
 	ensure_secrets_root
 
 	# Note: ssh-keygen -f id_rsa -y > id_rsa.pub
-	local key="id_rsa.${1,,}"
+	local key="id_${EP_SSH_KEY_TYPE,,}.${1,,}"
 	local secrets="${EP_SECRETS_ROOT}/${key}"
-	local userkey="$(eval echo ~"${1,,}")/.ssh/id_rsa"
+	local userkey="$(eval echo ~"${1,,}")/.ssh/id_${EP_SSH_KEY_TYPE,,}"
 
 	mkdir --parents "$(dirname "${userkey}")"
 
