@@ -37,7 +37,7 @@ function generate_gpgkey
 	local secrets="${EP_SECRETS_ROOT}/${key}"
 	local user="${4:-${1,,}}"
 
-	export GNUPGHOME="$(eval echo ~"${4,,}")/.gnupg"
+	export GNUPGHOME="$(eval echo ~"${user,,}")/.gnupg"
 	mkdir --mode=0700 --parents "${GNUPGHOME}"
 
 	# Even though it should be safe to invoke, let the caller do this for edge cases
