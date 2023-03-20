@@ -17,7 +17,7 @@ if [[ -z "${4}" || -n "${5}" ]] ; then
 fi
 
 component="${3}"
-suite="$(grep ^VERSION_CODENAME /etc/os-release | awk -F= '{print $2}')"
+[[ -n "${APT_SUITE}" ]] && suite="${APT_SUITE}" || suite="$(grep ^VERSION_CODENAME /etc/os-release | awk -F= '{print $2}')"
 keyid="${4}"
 name="${1}"
 uri="${2}"
