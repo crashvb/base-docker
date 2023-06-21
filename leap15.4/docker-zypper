@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+/sbin/docker-zypper-install "$@"
+/sbin/docker-zypper-clean

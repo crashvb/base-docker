@@ -1,0 +1,97 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+source /usr/local/lib/entrypoint.sh
+
+ZYPPER_ARCHITECTURES="${ZYPPER_ARCHITECTURES:=amd64}"
+ZYPPER_ARCHIVE_TYPE="${ZYPPER_ARCHIVE_TYPE:=rpm src.rpm}"
+GPG_KEYSERVER="${GPG_KEYSERVER:=keyserver.ubuntu.com}"
+ZYPPER_KEYRING_PATH="${ZYPPER_KEYRING_PATH:=/etc/zypp/credentials.d}"
+ZYPPER_SOURCE_TYPE="${ZYPPER_SOURCE_TYPE:=repo}"
+ZYPPER_SOURCES_PATH="${ZYPPER_SOURCES_PATH:=/etc/zypp/repos.d}"
+
+if [[ -z "${4}" || -n "${5}" ]] ; then
+	echo "usage ${0} <name> <uri> <component> <gpg key>" >&2
+	exit 1
+fi
+
+component="${3}"
+[[ -n "${APT_SUITE}" ]] && suite="${APT_SUITE}" || suite="$(grep ^VERSION_CODENAME /etc/os-release | awk -F= '{print $2}')"
+keyid="${4}"
+name="${1}"
+uri="${2}"
+
+function apt_rm_gpghomedir()
+{
+	GNUPGHOME="${gpghomedir}" gpgconf --quiet --kill all
+	rm --force --recursive "${gpghomedir}"
+}
+
+gpghomedir="$(mktemp --directory --tmpdir "$(basename "${0}").XXXXXXXXXX")"
+trap "apt_rm_gpghomedir" 0 HUP INT QUIT ILL ABRT FPE SEGV PIPE TERM
+chmod 0700 "${gpghomedir}"
+
+if [[ "${keyid}" =~ ^[a-zA-Z0-9]{16,40}$ ]] ; then
+	GNUPGHOME="${gpghomedir}" gpg --batch --keyserver "${GPG_KEYSERVER}" --quiet --recv-key "${keyid}"
+elif [[ "${keyid}" =~ :// ]] ; then
+	curl --fail --location --show-error --silent "${keyid}" | GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet -
+elif [[ "${keyid}" ==  "-" ]] ; then
+	GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet /dev/stdin
+else
+	GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet "${keyid}"
+fi
+
+fingerprint=$( \
+	GNUPGHOME="${gpghomedir}" \
+	gpg \
+		--with-colons \
+		--fingerprint \
+		--list-keys | \
+	grep ^fpr | \
+	awk -F: '{print $10}' | \
+	head --lines=1
+)
+keyring="${ZYPPER_KEYRING_PATH}/${fingerprint}.gpg"
+
+install --directory --group=root --mode=0755 --owner=root "${ZYPPER_KEYRING_PATH}"
+rm --force "${keyring}"
+GNUPGHOME="${gpghomedir}" gpg --batch --export --no-default-keyring --output "${keyring}" --quiet
+
+log "Generated: ${keyring}\n$( \
+	GNUPGHOME="/dev/null" gpg \
+		--fingerprint \
+		--show-keys \
+		--with-subkey-fingerprint \
+		"${keyring}" \
+		2>/dev/null | \
+	sed --expression="s/^/\t/g" \
+)"
+
+# https://manpages.debian.org/stretch/apt/sources.list.5.en.html
+# /usr/lib/python3/dist-packages/softwareproperties/ppa.py::PPAShortcutHandler
+sources="${ZYPPER_SOURCES_PATH}/${name}"
+if [[ "${ZYPPER_SOURCE_TYPE,,}" == "repo" ]] ; then
+	sources="${sources}.repo"
+	rm --force "${sources}"
+	arch="$(echo "${ZYPPER_ARCHITECTURES}" | tr " " ",")"
+	for archive_type in ${ZYPPER_ARCHIVE_TYPE,,} ; do
+		echo "${archive_type} [arch=${arch} signed-by=${keyring}] ${uri} ${suite} ${component}"
+	done > "${sources}"
+elif [[ "${ZYPPER_SOURCE_TYPE,,}" == "sources" ]] ; then
+	sources="${sources}.sources"
+	rm --force "${sources}"
+	cat <<- EOF > "${sources}"
+		Types: ${ZYPPER_ARCHIVE_TYPE,,}
+		Architectures: ${ZYPPER_ARCHITECTURES}
+		Signed-By: ${keyring}
+		URIs: ${uri}
+		Suites: ${suite}
+		Components: ${component}
+	EOF
+else
+	log "FATAL: Unknown source type: ${ZYPPER_SOURCE_TYPE}" >&2
+	exit 1
+fi
+log "Generated: ${sources}\n$(sed --expression="s/^/\t/g" "${sources}")"
+

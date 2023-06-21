@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+zypper clean --all
+rm --force --recursive \
+	/tmp/* \
+	/usr/share/{info,man}/* \
+	/var/tmp/*
+find /usr/share/doc -depth -type f ! -name copyright -exec rm --force {} \;
