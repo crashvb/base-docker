@@ -207,8 +207,7 @@ function render_template
 {
 	log "Generating: $(basename "${2}") ..."
 	if [[ -f "${1}.defaults" ]] ; then
-		while IFS="=" read -r key value
-		do
+		while IFS="=" read -r key value ; do
 			eval "export ${key}=\${${key}:=${value}}"
 			log "	${key}=${!key}"
 		done < "${1}.defaults"
