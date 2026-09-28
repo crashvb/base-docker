@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+apt-get clean
+apt-get autoremove --yes
+rm --force --recursive \
+	/tmp/* \
+	/usr/share/{info,lintian,man}/* \
+	/var/lib/apt/lists/* \
+	/var/tmp/*
+find /usr/share/doc -depth -type f ! -name copyright -exec rm --force {} \;
+

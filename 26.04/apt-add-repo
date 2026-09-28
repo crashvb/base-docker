@@ -1,0 +1,97 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+source /usr/local/lib/entrypoint.sh
+
+APT_ARCHITECTURES="${APT_ARCHITECTURES:=amd64}"
+APT_ARCHIVE_TYPE="${APT_ARCHIVE_TYPE:=deb deb-src}"
+APT_KEYSERVER="${APT_KEYSERVER:=keyserver.ubuntu.com}"
+APT_KEYRING_PATH="${APT_KEYRING_PATH:=/etc/apt/keyrings}"
+APT_SOURCE_TYPE="${APT_SOURCE_TYPE:=list}"
+APT_SOURCES_PATH="${APT_SOURCES_PATH:=/etc/apt/sources.list.d}"
+
+if [[ -z "${4}" || -n "${5}" ]] ; then
+	echo "usage ${0} <name> <uri> <component> <gpg key>" >&2
+	exit 1
+fi
+
+component="${3}"
+[[ -n "${APT_SUITE}" ]] && suite="${APT_SUITE}" || suite="$(grep ^VERSION_CODENAME /etc/os-release | awk -F= '{print $2}')"
+keyid="${4}"
+name="${1}"
+uri="${2}"
+
+function apt_rm_gpghomedir()
+{
+	GNUPGHOME="${gpghomedir}" gpgconf --quiet --kill all
+	rm --force --recursive "${gpghomedir}"
+}
+
+gpghomedir="$(mktemp --directory --tmpdir "$(basename "${0}").XXXXXXXXXX")"
+trap "apt_rm_gpghomedir" 0 HUP INT QUIT ILL ABRT FPE SEGV PIPE TERM
+chmod 0700 "${gpghomedir}"
+
+if [[ "${keyid}" =~ ^[a-zA-Z0-9]{16,40}$ ]] ; then
+	GNUPGHOME="${gpghomedir}" gpg --batch --keyserver "${APT_KEYSERVER}" --quiet --recv-key "${keyid}"
+elif [[ "${keyid}" =~ :// ]] ; then
+	curl --fail --location --show-error --silent "${keyid}" | GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet -
+elif [[ "${keyid}" ==  "-" ]] ; then
+	GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet /dev/stdin
+else
+	GNUPGHOME="${gpghomedir}" gpg --batch --import --quiet "${keyid}"
+fi
+
+fingerprint=$( \
+	GNUPGHOME="${gpghomedir}" \
+	gpg \
+		--with-colons \
+		--fingerprint \
+		--list-keys | \
+	grep ^fpr | \
+	awk -F: '{print $10}' | \
+	head --lines=1
+)
+keyring="${APT_KEYRING_PATH}/${fingerprint}.gpg"
+
+install --directory --group=root --mode=0755 --owner=root "${APT_KEYRING_PATH}"
+rm --force "${keyring}"
+GNUPGHOME="${gpghomedir}" gpg --batch --export --no-default-keyring --output "${keyring}" --quiet
+
+log "Generated: ${keyring}\n$( \
+	GNUPGHOME="/dev/null" gpg \
+		--fingerprint \
+		--show-keys \
+		--with-subkey-fingerprint \
+		"${keyring}" \
+		2>/dev/null | \
+	sed --expression="s/^/\t/g" \
+)"
+
+# https://manpages.debian.org/stretch/apt/sources.list.5.en.html
+# /usr/lib/python3/dist-packages/softwareproperties/ppa.py::PPAShortcutHandler
+sources="${APT_SOURCES_PATH}/${name}"
+if [[ "${APT_SOURCE_TYPE,,}" == "list" ]] ; then
+	sources="${sources}.list"
+	rm --force "${sources}"
+	arch="$(echo "${APT_ARCHITECTURES}" | tr " " ",")"
+	for archive_type in ${APT_ARCHIVE_TYPE,,} ; do
+		echo "${archive_type} [arch=${arch} signed-by=${keyring}] ${uri} ${suite} ${component}"
+	done > "${sources}"
+elif [[ "${APT_SOURCE_TYPE,,}" == "sources" ]] ; then
+	sources="${sources}.sources"
+	rm --force "${sources}"
+	cat <<- EOF > "${sources}"
+		Types: ${APT_ARCHIVE_TYPE,,}
+		Architectures: ${APT_ARCHITECTURES}
+		Signed-By: ${keyring}
+		URIs: ${uri}
+		Suites: ${suite}
+		Components: ${component}
+	EOF
+else
+	log "FATAL: Unknown source type: ${APT_SOURCE_TYPE}" >&2
+	exit 1
+fi
+log "Generated: ${sources}\n$(sed --expression="s/^/\t/g" "${sources}")"
+

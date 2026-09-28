@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e -o pipefail
+
+/sbin/docker-apt-install "$@"
+/sbin/docker-apt-clean
+

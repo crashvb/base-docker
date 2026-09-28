@@ -1,0 +1,25 @@
+#!/bin/bash
+
+source /usr/local/lib/entrypoint.sh
+
+set -e -o pipefail
+shopt -s nullglob
+
+for i in /etc/entrypoint.d/*
+do
+	if [[ -f "${i}" && -x "${i}" ]] ; then
+		log "Invoking: $(basename "${i}") ..."
+		source "${i}" "$@"
+	fi
+done
+
+echo "Container initialized on $(date +%Y-%m-%d_%H:%M:%S) by PID ${BASHPID}" > "${EP_RUN}"
+
+if [[ -n "${EP_USER}" ]] && [[ "${EP_USER}" != "root" ]] ; then
+	log "User: ${EP_USER}"
+	set -- su --login "${EP_USER}" --command='"$0" "$@"' -- "$@"
+fi
+
+log "Launching:" "$@" "..."
+exec "$@"
+
